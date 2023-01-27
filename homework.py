@@ -86,15 +86,6 @@ def parse_status(homework) -> str:
                      )
 
 
-def send_if_changed(message, previous_message):
-    """Вынос в функцию."""
-    message = ''
-    previous_message = ''
-    if message != previous_message:
-        return message
-    return previous_message
-
-
 def main():
     """Основная логика бота."""
     if not check_tokens():
