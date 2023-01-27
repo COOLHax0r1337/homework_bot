@@ -1,16 +1,14 @@
 import os
-
-from dotenv import load_dotenv
-
 import logging
 import requests
 import sys
-import telegram
 import time
 
+from dotenv import load_dotenv
+import telegram
 from http import HTTPStatus
 
-from exceptions import (ValuesMissingErr, IncorrectCode, WrongResponse)
+from exceptions import ValuesMissingErr, IncorrectCode
 
 load_dotenv()
 
@@ -29,23 +27,22 @@ HOMEWORK_VERDICTS = {
 }
 
 
-def check_tokens():
+def check_tokens() -> bool:
     """Проверяем, что все токены на месте."""
-    logging.info('Проверка всех токенов')
-    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
+    return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
 
 
-def send_message(bot, message):
+def send_message(bot, message) -> None:
     """Отправление сообщения."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.info('Сообщение отправлено')
         logging.debug('Успешно')
-    except Exception as error:
-        logging.error(f'Сообщение не было отправлено {error}')
+    except Exception:
+        logging.error('Сообщение не было отправлено')
 
 
-def get_api_answer(timestamp):
+def get_api_answer(timestamp) -> dict:
     """Запрос к API домашки."""
     timestamp = int(time.time())
     params_request = {
@@ -53,37 +50,33 @@ def get_api_answer(timestamp):
         'headers': HEADERS,
         'params': {'from_date': timestamp},
     }
-    message = ('Инициация запроса API').format(**params_request)
-    logging.info(message)
     try:
         response = requests.get(**params_request)
         if response.status_code != HTTPStatus.OK:
-            raise IncorrectCode
+            raise IncorrectCode('Wrong API answer')
         return response.json()
-    except Exception as error:
-        message = ('Status not 200').format(**params_request)
-        raise IncorrectCode(message, error)
+    except Exception:
+        raise IncorrectCode('Wrong status code')
 
 
-def check_response(response):
+def check_response(response: dict) -> list:
     """Проверка респонса апишки."""
-    logging.info('API correct check')
-    if not isinstance(response, dict):
-        raise TypeError('APIs not dict')
-    if 'homeworks' not in response or 'current_date' not in response:
-        raise WrongResponse('No homeworks key')
-    homeworks = response.get('homeworks')
-    if not isinstance(homeworks, list):
-        raise TypeError('homework is not a list')
-    return homeworks
+    try:
+        homework = response['homeworks']
+    except KeyError:
+        logging.error('No homeworks key found')
+    if not isinstance(homework, list):
+        logging.error('Homeworks is not a list')
+        raise TypeError('Homeworks is not a list')
+    return homework
 
 
-def parse_status(homework):
+def parse_status(homework) -> str:
     """Получаем статус домашки."""
-    logging.info('just checking')
-    if 'homework_name' not in homework:
-        raise KeyError('No homework_name key found')
-    homework_name = homework.get('homework_name')
+    try:
+        homework_name = homework['homework_name']
+    except KeyError:
+        logging.error('Wrong server response')
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_VERDICTS:
         raise ValuesMissingErr(f'Неизвестный статус - {homework_status}')
@@ -91,6 +84,15 @@ def parse_status(homework):
             ).format(homework_name=homework_name,
                      verdict=HOMEWORK_VERDICTS[homework_status]
                      )
+
+
+def send_if_changed(message, previous_message):
+    """Вынос в функцию."""
+    message = ''
+    previous_message = ''
+    if message != previous_message:
+        return message
+    return previous_message
 
 
 def main():
@@ -104,7 +106,7 @@ def main():
     start_message = 'Бот активирован'
     send_message(bot, start_message)
     logging.info(start_message)
-    prevoius_message = ''
+    previous_message = ''
     while True:
         try:
             response = get_api_answer(timestamp)
@@ -116,17 +118,14 @@ def main():
                 message = parse_status(homeworks[0])
             else:
                 message = 'Обновлений нет'
-            if message != prevoius_message:
+            if message != previous_message:
                 send_message(bot, message)
-                prevoius_message = message
+                previous_message = message
             else:
                 logging.info(message)
-        except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            logging.error(message, exc_info=True)
-            if message != prevoius_message:
-                send_message(bot, message)
-                prevoius_message = message
+        except Exception:
+            message = 'Сбой в работе программы'
+            send_message(bot, message)
         finally:
             time.sleep(RETRY_PERIOD)
 
