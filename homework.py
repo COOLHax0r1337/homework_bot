@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import telegram
 from http import HTTPStatus
 
-from exceptions import ValuesMissingErr, IncorrectCode
+from exceptions import ValuesMissingErr, IncorrectCode, ProgramErr
 
 load_dotenv()
 
@@ -32,17 +32,17 @@ def check_tokens() -> bool:
     return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
 
 
-def send_message(bot, message) -> None:
+def send_message(bot: telegram.bot.Bot, message: str) -> None:
     """Отправление сообщения."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.info('Сообщение отправлено')
         logging.debug('Успешно')
-    except Exception:
+    except telegram.error.TelegramError:
         logging.error('Сообщение не было отправлено')
 
 
-def get_api_answer(timestamp) -> dict:
+def get_api_answer(timestamp: int) -> dict:
     """Запрос к API домашки."""
     timestamp = int(time.time())
     params_request = {
@@ -55,7 +55,7 @@ def get_api_answer(timestamp) -> dict:
         if response.status_code != HTTPStatus.OK:
             raise IncorrectCode('Wrong API answer')
         return response.json()
-    except Exception:
+    except requests.RequestException:
         raise IncorrectCode('Wrong status code')
 
 
@@ -71,7 +71,7 @@ def check_response(response: dict) -> list:
     return homework
 
 
-def parse_status(homework) -> str:
+def parse_status(homework: dict) -> str:
     """Получаем статус домашки."""
     try:
         homework_name = homework['homework_name']
@@ -114,7 +114,7 @@ def main():
                 previous_message = message
             else:
                 logging.info(message)
-        except Exception:
+        except ProgramErr:
             message = 'Сбой в работе программы'
             send_message(bot, message)
         finally:

@@ -4,3 +4,7 @@ class ValuesMissingErr(Exception):
 
 class IncorrectCode(Exception):
     """Wrong API answer."""
+
+
+class ProgramErr(Exception):
+    """Program stopped working."""
