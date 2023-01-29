@@ -52,11 +52,11 @@ def get_api_answer(timestamp: int) -> dict:
     }
     try:
         response = requests.get(**params_request)
-        if response.status_code != HTTPStatus.OK:
-            raise IncorrectCode('Wrong API answer')
-        return response.json()
     except requests.RequestException:
         raise IncorrectCode('Wrong status code')
+    if response.status_code != HTTPStatus.OK:
+        raise IncorrectCode('Wrong API answer')
+    return response.json()
 
 
 def check_response(response: dict) -> list:
@@ -65,6 +65,7 @@ def check_response(response: dict) -> list:
         homework = response['homeworks']
     except KeyError:
         logging.error('No homeworks key found')
+        raise KeyError('Bot stopped working, check hw keys')
     if not isinstance(homework, list):
         logging.error('Homeworks is not a list')
         raise TypeError('Homeworks is not a list')
@@ -77,6 +78,7 @@ def parse_status(homework: dict) -> str:
         homework_name = homework['homework_name']
     except KeyError:
         logging.error('Wrong server response')
+        raise KeyError('Wrong server response, try again later')
     homework_status = homework.get('status')
     if homework_status not in HOMEWORK_VERDICTS:
         raise ValuesMissingErr(f'Неизвестный статус - {homework_status}')
@@ -86,7 +88,7 @@ def parse_status(homework: dict) -> str:
                      )
 
 
-def main():
+def main() -> None:
     """Основная логика бота."""
     if not check_tokens():
         message = 'Токен отсутствует'
@@ -94,9 +96,6 @@ def main():
         sys.exit(message)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    start_message = 'Бот активирован'
-    send_message(bot, start_message)
-    logging.info(start_message)
     previous_message = ''
     while True:
         try:
